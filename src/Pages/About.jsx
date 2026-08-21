@@ -1,6 +1,160 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
+
+// ========================================================
+// FORMSPREE
+// ========================================================
+
+const FORMSPREE_ENDPOINT =
+    "https://formspree.io/f/maewwrqe";
+
+
 function About() {
+
+    // ========================================================
+    // CONTACT FORM STATE
+    // ========================================================
+
+    const [contactStatus, setContactStatus] =
+        useState("");
+
+    const [isSubmitting, setIsSubmitting] =
+        useState(false);
+
+
+    // ========================================================
+    // CONTACT FORM SUBMIT
+    // ========================================================
+
+    const handleContactSubmit = async (event) => {
+
+        event.preventDefault();
+
+        if (isSubmitting) {
+            return;
+        }
+
+
+        const form =
+            event.currentTarget;
+
+
+        const formData =
+            new FormData(form);
+
+
+        // Honeypot protection
+
+        const honeypot =
+            formData.get("_gotcha");
+
+
+        if (honeypot) {
+
+            setContactStatus(
+                "Thanks! Your message has been received."
+            );
+
+            form.reset();
+
+            return;
+        }
+
+
+        setIsSubmitting(true);
+
+        setContactStatus(
+            "Sending your message..."
+        );
+
+
+        try {
+
+            const response =
+                await fetch(
+                    FORMSPREE_ENDPOINT,
+                    {
+                        method: "POST",
+
+                        body: formData,
+
+                        headers: {
+                            Accept:
+                                "application/json"
+                        }
+                    }
+                );
+
+
+            if (response.ok) {
+
+                setContactStatus(
+                    "✅ Message sent successfully! Thank you for contacting us."
+                );
+
+                form.reset();
+
+            }
+            else {
+
+                let errorMessage =
+                    "Failed to send message. Please try again.";
+
+                try {
+
+                    const data =
+                        await response.json();
+
+                    if (
+                        data?.errors &&
+                        data.errors.length > 0
+                    ) {
+
+                        errorMessage =
+                            data.errors
+                                .map(
+                                    (error) =>
+                                        error.message
+                                )
+                                .join(" ");
+
+                    }
+
+                }
+                catch {
+                    // Keep default error message
+                }
+
+
+                setContactStatus(
+                    `❌ ${errorMessage}`
+                );
+
+            }
+
+        }
+        catch (error) {
+
+            console.error(
+                "Contact form error:",
+                error
+            );
+
+
+            setContactStatus(
+                "❌ Unable to send your message. Please check your internet connection and try again."
+            );
+
+        }
+        finally {
+
+            setIsSubmitting(false);
+
+        }
+
+    };
+
 
     return (
         <>
@@ -217,7 +371,12 @@ function About() {
                 </h1>
 
 
-                <form id="contactForm">
+                <form
+                    id="contactForm"
+                    onSubmit={handleContactSubmit}
+                >
+
+                    {/* NAME */}
 
                     <input
                         type="text"
@@ -228,6 +387,8 @@ function About() {
                     />
 
 
+                    {/* EMAIL */}
+
                     <input
                         type="email"
                         id="contactEmail"
@@ -237,6 +398,8 @@ function About() {
                     />
 
 
+                    {/* MESSAGE */}
+
                     <textarea
                         id="contactMessage"
                         name="message"
@@ -245,32 +408,51 @@ function About() {
                     />
 
 
-                    {/* Honeypot */}
+                    {/* HONEYPOT */}
 
                     <input
                         type="text"
                         id="contactHoneypot"
                         name="_gotcha"
+                        tabIndex="-1"
+                        autoComplete="off"
                         style={{
                             display: "none"
                         }}
                     />
 
 
+                    {/* SUBMIT BUTTON */}
+
                     <button
                         type="submit"
                         id="contactSubmitBtn"
+                        disabled={isSubmitting}
                     >
-                        Send Message
+
+                        {isSubmitting
+                            ? "Sending..."
+                            : "Send Message"}
+
                     </button>
 
 
-                    <div
-                        id="contactStatus"
-                        style={{
-                            marginTop: "15px"
-                        }}
-                    />
+                    {/* STATUS */}
+
+                    {contactStatus && (
+
+                        <div
+                            id="contactStatus"
+                            style={{
+                                marginTop: "15px"
+                            }}
+                        >
+
+                            {contactStatus}
+
+                        </div>
+
+                    )}
 
                 </form>
 
@@ -300,6 +482,7 @@ function About() {
 
         </>
     );
+
 }
 
 

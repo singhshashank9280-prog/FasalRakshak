@@ -11,17 +11,6 @@ import {
 
 import { saveToHistory } from "../Services/history";
 
-import Voice from "../components/Voice";
-
-const voiceLanguages = {
-    english: "en-IN",
-    bengali: "bn-IN",
-    telugu: "te-IN",
-    marathi: "mr-IN",
-    odia: "or-IN",
-    assamese: "as-IN"
-};
-
 function Disease() {
 
     // ========================================================
@@ -36,6 +25,9 @@ function Disease() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const [error, setError] = useState("");
+
+    // Farm profile
+    const [farmProfile, setFarmProfile] = useState(null);
 
 
     // ========================================================
@@ -65,12 +57,174 @@ function Disease() {
 
 
     // ========================================================
+    // LOAD FARM PROFILE
+    // ========================================================
+
+    useEffect(() => {
+
+        const loadProfile = () => {
+
+            const savedProfile =
+                localStorage.getItem("farmProfile");
+
+            if (savedProfile) {
+
+                try {
+
+                    setFarmProfile(
+                        JSON.parse(savedProfile)
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "Failed to load farm profile:",
+                        error
+                    );
+
+                }
+
+            }
+
+        };
+
+        loadProfile();
+
+        // Update if user comes back from Home
+        window.addEventListener(
+            "storage",
+            loadProfile
+        );
+
+        return () => {
+
+            window.removeEventListener(
+                "storage",
+                loadProfile
+            );
+
+        };
+
+    }, []);
+
+
+    // ========================================================
+    // CURRENT SEASON
+    // ========================================================
+
+    const getCurrentSeason = () => {
+
+        const month =
+            new Date().getMonth() + 1;
+
+        if (month >= 11 || month <= 2) {
+            return "Winter";
+        }
+
+        if (month >= 3 && month <= 5) {
+            return "Summer";
+        }
+
+        if (month >= 6 && month <= 9) {
+            return "Monsoon";
+        }
+
+        return "Post-Monsoon";
+
+    };
+
+
+    // ========================================================
+    // WEATHER DISPLAY
+    // Handles new object format + old string format
+    // ========================================================
+
+    const getWeatherDisplay = () => {
+
+        if (!farmProfile?.weather) {
+
+            return "Weather not set";
+
+        }
+
+        // New format:
+        // weather: {
+        //     temp,
+        //     humidity,
+        //     precipitation,
+        //     label
+        // }
+
+        if (
+            typeof farmProfile.weather === "object"
+        ) {
+
+            const weather =
+                farmProfile.weather;
+
+            const temperature =
+                weather.temp !== undefined
+                    ? `${Math.round(weather.temp)}°C`
+                    : "";
+
+            const label =
+                weather.label || "";
+
+            const humidity =
+                weather.humidity !== undefined
+                    ? `Humidity ${weather.humidity}%`
+                    : "";
+
+            const rain =
+                weather.precipitation !== undefined
+                    ? `Rain ${weather.precipitation} mm`
+                    : "";
+
+            const mainText =
+                [temperature, label]
+                    .filter(Boolean)
+                    .join(" - ");
+
+            const extraText =
+                [humidity, rain]
+                    .filter(Boolean)
+                    .join(" | ");
+
+            return (
+                <>
+                    {mainText || "Weather unavailable"}
+
+                    {extraText && (
+                        <>
+                            <br />
+                            <small>
+                                {extraText}
+                            </small>
+                        </>
+                    )}
+                </>
+            );
+
+        }
+
+        // Old format:
+        // weather: "28°C"
+
+        return String(
+            farmProfile.weather
+        );
+
+    };
+
+
+    // ========================================================
     // IMAGE SELECTION
     // ========================================================
 
     const handleImageChange = (event) => {
 
-        const file = event.target.files[0];
+        const file =
+            event.target.files[0];
 
         if (!file) {
 
@@ -80,19 +234,19 @@ function Disease() {
             setError("");
 
             return;
-        }
 
+        }
 
         setSelectedImage(file);
 
         setResult(null);
         setError("");
 
-
         const url =
             URL.createObjectURL(file);
 
         setPreviewUrl(url);
+
     };
 
 
@@ -107,13 +261,11 @@ function Disease() {
             const reader =
                 new FileReader();
 
-
             reader.onload = () => {
 
                 resolve(reader.result);
 
             };
-
 
             reader.onerror = () => {
 
@@ -125,9 +277,10 @@ function Disease() {
 
             };
 
-
             reader.readAsDataURL(file);
+
         });
+
     };
 
 
@@ -144,15 +297,12 @@ function Disease() {
             );
 
             return;
+
         }
 
-
         setIsAnalyzing(true);
-
         setResult(null);
-
         setError("");
-
 
         try {
 
@@ -160,33 +310,20 @@ function Disease() {
                 "📷 Starting disease detection..."
             );
 
-
-            // ------------------------------------------------
-            // Convert uploaded image to Base64
-            // ------------------------------------------------
-
             const imageData =
                 await imageToDataURL(
                     selectedImage
                 );
 
-
             console.log(
                 "📷 Image converted successfully."
             );
 
-
-            // ------------------------------------------------
-            // Create image element for local model
-            // ------------------------------------------------
-
             const imageElement =
                 new Image();
 
-
             imageElement.src =
                 previewUrl;
-
 
             await new Promise(
                 (resolve, reject) => {
@@ -196,18 +333,13 @@ function Disease() {
 
                     imageElement.onerror =
                         reject;
+
                 }
             );
-
-
-            // ------------------------------------------------
-            // HYBRID DETECTION
-            // ------------------------------------------------
 
             console.log(
                 "🌱 Running hybrid detection..."
             );
-
 
             const detectionResult =
                 await analyzeCropHybrid(
@@ -215,12 +347,10 @@ function Disease() {
                     imageData
                 );
 
-
             console.log(
                 "🌱 Hybrid detection result:",
                 detectionResult
             );
-
 
             if (
                 !detectionResult ||
@@ -233,8 +363,7 @@ function Disease() {
 
             }
 
-
-           setResult(
+            setResult(
                 detectionResult
             );
 
@@ -243,7 +372,9 @@ function Disease() {
             // SAVE DETECTION HISTORY
             // ====================================================
 
-            if (detectionResult.mode === "online") {
+            if (
+                detectionResult.mode === "online"
+            ) {
 
                 saveToHistory(
                     "Gemini AI Analysis",
@@ -252,7 +383,10 @@ function Disease() {
                 );
 
             }
-            else if (detectionResult.mode === "offline") {
+
+            else if (
+                detectionResult.mode === "offline"
+            ) {
 
                 const info =
                     DISEASE_INFO[
@@ -264,7 +398,6 @@ function Disease() {
                         ? info.name
                         : detectionResult.prediction;
 
-
                 saveToHistory(
                     diseaseName,
                     detectionResult.confidence,
@@ -273,27 +406,29 @@ function Disease() {
 
             }
 
-                    }
-                    catch (error) {
+        }
 
-                        console.error(
-                            "❌ Disease detection failed:",
-                            error
-                        );
+        catch (error) {
 
+            console.error(
+                "❌ Disease detection failed:",
+                error
+            );
 
-                        setError(
-                            error.message ||
-                            "Disease detection failed."
-                        );
+            setError(
+                error.message ||
+                "Disease detection failed."
+            );
 
-                    }
-                    finally {
+        }
 
-                        setIsAnalyzing(false);
+        finally {
 
-                    }
-                };
+            setIsAnalyzing(false);
+
+        }
+
+    };
 
 
     // ========================================================
@@ -308,8 +443,8 @@ function Disease() {
         ) {
 
             return null;
-        }
 
+        }
 
         return (
             DISEASE_INFO[
@@ -330,8 +465,10 @@ function Disease() {
 
                 remedy:
                     "-"
+
             }
         );
+
     };
 
 
@@ -342,7 +479,9 @@ function Disease() {
     const renderResult = () => {
 
         if (!result) {
+
             return null;
+
         }
 
 
@@ -350,13 +489,15 @@ function Disease() {
         // ONLINE → GEMINI
         // ====================================================
 
-        if (result.mode === "online") {
+        if (
+            result.mode === "online"
+        ) {
 
             const analysis =
                 result.analysis;
 
-
             // Gemini returned plain text
+
             if (
                 typeof analysis === "string"
             ) {
@@ -380,7 +521,6 @@ function Disease() {
 
                         </div>
 
-
                         <p
                             style={{
                                 whiteSpace:
@@ -394,10 +534,12 @@ function Disease() {
                     </div>
 
                 );
+
             }
 
 
             // Gemini returned structured data
+
             return (
 
                 <div className="result-box">
@@ -417,55 +559,59 @@ function Disease() {
 
                     </div>
 
-
                     <h2>
                         {analysis?.crop ||
                             "Crop Analysis"}
                     </h2>
 
-
                     <p>
+
                         <strong>
                             Disease:
                         </strong>{" "}
 
                         {analysis?.disease ||
                             "Unknown"}
+
                     </p>
 
-
                     <p>
+
                         <strong>
                             Cause:
                         </strong>{" "}
 
                         {analysis?.cause ||
                             "Not available"}
+
                     </p>
 
-
                     <p>
+
                         <strong>
                             Precautions:
                         </strong>{" "}
 
                         {analysis?.precautions ||
                             "Not available"}
+
                     </p>
 
-
                     <p>
+
                         <strong>
                             Remedy:
                         </strong>{" "}
 
                         {analysis?.remedy ||
                             "Not available"}
+
                     </p>
 
                 </div>
 
             );
+
         }
 
 
@@ -473,28 +619,26 @@ function Disease() {
         // OFFLINE → TEACHABLE MACHINE
         // ====================================================
 
-        if (result.mode === "offline") {
+        if (
+            result.mode === "offline"
+        ) {
 
             const info =
                 getOfflineInfo();
 
-
             const confidence =
                 result.confidence;
-
 
             const isHealthy =
                 info.name
                     .toLowerCase()
                     .includes("healthy");
 
-
             let severity =
                 0;
 
             let recovery =
                 "";
-
 
             if (isHealthy) {
 
@@ -504,6 +648,7 @@ function Disease() {
                     "Not applicable — crop is healthy.";
 
             }
+
             else if (
                 confidence >= 80
             ) {
@@ -514,6 +659,7 @@ function Disease() {
                     "Moderate to low — act quickly.";
 
             }
+
             else if (
                 confidence >= 60
             ) {
@@ -524,12 +670,14 @@ function Disease() {
                     "Good — early stage, monitor closely.";
 
             }
+
             else {
 
                 severity = 25;
 
                 recovery =
                     "Uncertain diagnosis — try a clearer photo.";
+
             }
 
 
@@ -592,7 +740,6 @@ function Disease() {
                         </strong>
 
                     </p>
-
 
                     <div
                         style={{
@@ -678,8 +825,7 @@ function Disease() {
                     {/* OTHER POSSIBILITIES */}
 
                     {result.predictions &&
-                        result.predictions.length >
-                            1 && (
+                        result.predictions.length > 1 && (
 
                             <>
 
@@ -691,7 +837,6 @@ function Disease() {
 
                                 </p>
 
-
                                 <ul>
 
                                     {result.predictions
@@ -699,19 +844,15 @@ function Disease() {
                                         .map(
                                             (prediction) => {
 
-                                                const
-                                                    otherInfo =
-                                                        DISEASE_INFO[
-                                                            prediction.className
-                                                        ];
+                                                const otherInfo =
+                                                    DISEASE_INFO[
+                                                        prediction.className
+                                                    ];
 
-
-                                                const
-                                                    otherName =
-                                                        otherInfo
-                                                            ? otherInfo.name
-                                                            : prediction.className;
-
+                                                const otherName =
+                                                    otherInfo
+                                                        ? otherInfo.name
+                                                        : prediction.className;
 
                                                 return (
 
@@ -748,8 +889,7 @@ function Disease() {
 
                     {/* ALTERNATIVE CROPS */}
 
-                    {alternatives.length >
-                        0 && (
+                    {alternatives.length > 0 && (
 
                         <>
 
@@ -760,7 +900,6 @@ function Disease() {
                                 </strong>
 
                             </p>
-
 
                             <ul>
 
@@ -789,15 +928,17 @@ function Disease() {
                             </ul>
 
                         </>
+
                     )}
 
                 </div>
 
             );
+
         }
 
-
         return null;
+
     };
 
 
@@ -806,6 +947,7 @@ function Disease() {
     // ========================================================
 
     return (
+
         <>
 
             {/* ================= NAVBAR ================= */}
@@ -817,7 +959,6 @@ function Disease() {
                     <div className="logo">
                         🌱 FasalRakshak
                     </div>
-
 
                     <div className="nav-links">
 
@@ -867,7 +1008,69 @@ function Disease() {
 
                 <div className="farm-summary-banner">
 
-                    {/* Farm summary will be connected later */}
+                    {!farmProfile ? (
+
+                        <p>
+
+                            🌾 Set up your{" "}
+
+                            <Link to="/">
+                                Farm Profile
+                            </Link>{" "}
+
+                            on the Home page to see local
+                            weather and seasonal crop tips here.
+
+                        </p>
+
+                    ) : (
+
+                        <p>
+
+                            📍{" "}
+
+                            <strong>
+                                {farmProfile.location ||
+                                    "Location not set"}
+                            </strong>
+
+                            {farmProfile.locationSub && (
+
+                                <>
+                                    {" "}
+                                    ({farmProfile.locationSub})
+                                </>
+
+                            )}
+
+                            &nbsp;|&nbsp;
+
+                            ☁️{" "}
+
+                            {getWeatherDisplay()}
+
+                            &nbsp;|&nbsp;
+
+                            🌱 Soil:{" "}
+
+                            {farmProfile.soilType ||
+                                "not set"}
+
+                            &nbsp;|&nbsp;
+
+                            🗓️{" "}
+
+                            {getCurrentSeason()}
+
+                            &nbsp;|&nbsp;
+
+                            <Link to="/">
+                                Update
+                            </Link>
+
+                        </p>
+
+                    )}
 
                 </div>
 
@@ -881,7 +1084,6 @@ function Disease() {
                 <h1>
                     Crop Disease Detection 🌱
                 </h1>
-
 
                 <p>
                     Upload a crop image and analyze the
@@ -916,7 +1118,6 @@ function Disease() {
                     />
 
                 )}
-
 
                 <br />
 
@@ -995,7 +1196,6 @@ function Disease() {
                     How It Works
                 </h1>
 
-
                 <div className="cards">
 
                     <div className="card">
@@ -1011,7 +1211,6 @@ function Disease() {
 
                     </div>
 
-
                     <div className="card">
 
                         <h3>
@@ -1024,7 +1223,6 @@ function Disease() {
                         </p>
 
                     </div>
-
 
                     <div className="card">
 
@@ -1065,7 +1263,9 @@ function Disease() {
             </footer>
 
         </>
+
     );
+
 }
 
 

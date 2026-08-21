@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 
 function Home() {
 
-    // ================= FARM STATE =================
+    // ========================================================
+    // FARM STATE
+    // ========================================================
 
     const [location, setLocation] = useState("Not set");
     const [locationSub, setLocationSub] = useState("");
@@ -19,9 +21,12 @@ function Home() {
     const [locationLoading, setLocationLoading] = useState(false);
 
 
-    // ================= CROP DATA =================
+    // ========================================================
+    // SEASONAL CROP DATA
+    // ========================================================
 
     const SEASON_CROPS = {
+
         Winter: {
             Sandy: ["Wheat", "Barley", "Peas", "Carrot"],
             Clay: ["Wheat", "Barley", "Peas", "Mustard"],
@@ -57,10 +62,13 @@ function Home() {
             Peaty: ["Potato", "Vegetables"],
             Chalky: ["Barley", "Mustard", "Peas"]
         }
+
     };
 
 
-    // ================= GET SEASON =================
+    // ========================================================
+    // GET CURRENT SEASON
+    // ========================================================
 
     const getCurrentSeason = () => {
 
@@ -82,7 +90,34 @@ function Home() {
     };
 
 
-    // ================= LOAD FARM PROFILE =================
+    // ========================================================
+    // SAVE FARM PROFILE
+    // ========================================================
+
+    const saveFarmProfile = (updatedData) => {
+
+        const oldProfile = JSON.parse(
+            localStorage.getItem("farmProfile") || "{}"
+        );
+
+        const newProfile = {
+            ...oldProfile,
+            ...updatedData,
+            updatedAt: Date.now()
+        };
+
+        localStorage.setItem(
+            "farmProfile",
+            JSON.stringify(newProfile)
+        );
+
+        return newProfile;
+    };
+
+
+    // ========================================================
+    // LOAD FARM PROFILE
+    // ========================================================
 
     useEffect(() => {
 
@@ -90,83 +125,91 @@ function Home() {
 
         setSeason(currentSeason);
 
-
         const savedProfile =
             localStorage.getItem("farmProfile");
 
-        if (savedProfile) {
+        if (!savedProfile) {
+            return;
+        }
 
-            try {
+        try {
 
-                const profile =
-                    JSON.parse(savedProfile);
+            const profile =
+                JSON.parse(savedProfile);
 
-                if (profile.location) {
-                    setLocation(profile.location);
-                }
 
-                if (profile.locationSub) {
-                    setLocationSub(profile.locationSub);
-                }
+            // LOCATION
 
-                if (profile.weather) {
-                    setWeather(profile.weather);
-                }
+            if (profile.location) {
+                setLocation(profile.location);
+            }
 
-                if (profile.weatherSub) {
-                    setWeatherSub(profile.weatherSub);
-                }
+            if (profile.locationSub) {
+                setLocationSub(profile.locationSub);
+            }
 
-                if (profile.soilType) {
 
-                    setSoilType(profile.soilType);
+            // WEATHER
 
-                    updateCropSuggestions(
-                        profile.soilType,
-                        currentSeason
+            if (profile.weather) {
+
+                if (typeof profile.weather === "object") {
+
+                    setWeather(
+                        `${Math.round(profile.weather.temp)}°C - ${profile.weather.label}`
                     );
+
+                    setWeatherSub(
+                        `Humidity: ${profile.weather.humidity}% • Rain: ${profile.weather.precipitation} mm`
+                    );
+
+                }
+                else {
+
+                    setWeather(profile.weather);
+
+                    if (profile.weatherSub) {
+                        setWeatherSub(profile.weatherSub);
+                    }
+
                 }
 
-            } catch (error) {
+            }
 
-                console.error(
-                    "Failed to load farm profile:",
-                    error
+
+            // SOIL
+
+            if (profile.soilType) {
+
+                setSoilType(profile.soilType);
+
+                updateCropSuggestions(
+                    profile.soilType,
+                    currentSeason
                 );
 
             }
+
+        }
+        catch (error) {
+
+            console.error(
+                "Failed to load farm profile:",
+                error
+            );
 
         }
 
     }, []);
 
 
-    // ================= SAVE FARM PROFILE =================
-
-    const saveFarmProfile = (updatedData) => {
-
-        const oldProfile =
-            JSON.parse(
-                localStorage.getItem("farmProfile") || "{}"
-            );
-
-        const newProfile = {
-            ...oldProfile,
-            ...updatedData
-        };
-
-        localStorage.setItem(
-            "farmProfile",
-            JSON.stringify(newProfile)
-        );
-    };
-
-
-    // ================= CROP SUGGESTIONS =================
+    // ========================================================
+    // CROP SUGGESTIONS
+    // ========================================================
 
     const updateCropSuggestions = (
         soil,
-        currentSeason = season
+        currentSeason
     ) => {
 
         if (!soil || !currentSeason) {
@@ -183,11 +226,14 @@ function Home() {
     };
 
 
-    // ================= SOIL CHANGE =================
+    // ========================================================
+    // SOIL CHANGE
+    // ========================================================
 
     const handleSoilChange = (event) => {
 
-        const value = event.target.value;
+        const value =
+            event.target.value;
 
         setSoilType(value);
 
@@ -202,7 +248,9 @@ function Home() {
     };
 
 
-    // ================= WEATHER =================
+    // ========================================================
+    // WEATHER
+    // ========================================================
 
     const fetchWeather = async (
         latitude,
@@ -214,27 +262,35 @@ function Home() {
             setWeather("Loading...");
             setWeatherSub("");
 
+
             const url =
                 `https://api.open-meteo.com/v1/forecast` +
                 `?latitude=${latitude}` +
                 `&longitude=${longitude}` +
-                `&current=temperature_2m,relative_humidity_2m,precipitation` +
+                `&current=temperature_2m,relative_humidity_2m,precipitation,weather_code` +
                 `&timezone=auto`;
+
 
             const response =
                 await fetch(url);
 
+
             if (!response.ok) {
+
                 throw new Error(
                     "Weather request failed"
                 );
+
             }
+
 
             const data =
                 await response.json();
 
+
             const current =
                 data.current;
+
 
             const temperature =
                 current.temperature_2m;
@@ -245,21 +301,35 @@ function Home() {
             const precipitation =
                 current.precipitation;
 
+            const weatherLabel =
+                describeWeatherCode(
+                    current.weather_code
+                );
+
+
             setWeather(
-                `${temperature}°C`
+                `${Math.round(temperature)}°C - ${weatherLabel}`
             );
+
 
             setWeatherSub(
                 `Humidity: ${humidity}% • Rain: ${precipitation} mm`
             );
 
+
             saveFarmProfile({
-                weather: `${temperature}°C`,
-                weatherSub:
-                    `Humidity: ${humidity}% • Rain: ${precipitation} mm`
+
+                weather: {
+                    temp: temperature,
+                    humidity: humidity,
+                    precipitation: precipitation,
+                    label: weatherLabel
+                }
+
             });
 
-        } catch (error) {
+        }
+        catch (error) {
 
             console.error(
                 "Weather error:",
@@ -267,6 +337,7 @@ function Home() {
             );
 
             setWeather("Unavailable");
+
             setWeatherSub(
                 "Could not fetch weather"
             );
@@ -275,11 +346,50 @@ function Home() {
     };
 
 
-    // ================= LOCATION =================
+    // ========================================================
+    // WEATHER CODE
+    // ========================================================
+
+    const describeWeatherCode = (code) => {
+
+        if (code === 0) {
+            return "Clear";
+        }
+
+        if (code <= 3) {
+            return "Partly Cloudy";
+        }
+
+        if (code <= 49) {
+            return "Foggy";
+        }
+
+        if (code <= 59) {
+            return "Drizzle";
+        }
+
+        if (code <= 69) {
+            return "Rain";
+        }
+
+        if (code <= 79) {
+            return "Snow";
+        }
+
+        if (code <= 99) {
+            return "Thunderstorm";
+        }
+
+        return "Unknown";
+    };
+
+
+    // ========================================================
+    // LOCATION DETECTION
+    // ========================================================
 
     const detectFarmLocation = () => {
 
-        //alert system whole file have to be changed
         if (!navigator.geolocation) {
 
             alert(
@@ -289,10 +399,15 @@ function Home() {
             return;
         }
 
+
         setLocationLoading(true);
 
         setLocation("Detecting...");
-        setLocationSub("");
+
+        setLocationSub(
+            "Please allow location access."
+        );
+
 
         navigator.geolocation.getCurrentPosition(
 
@@ -305,83 +420,124 @@ function Home() {
                     position.coords.longitude;
 
 
+                console.log(
+                    "Location detected:",
+                    latitude,
+                    longitude
+                );
+
+
                 try {
 
-                    // Reverse geocoding
+                    // =================================================
+                    // REVERSE GEOCODING
+                    // =================================================
+
+                    const url =
+                        `https://api.bigdatacloud.net/data/reverse-geocode-client` +
+                        `?latitude=${latitude}` +
+                        `&longitude=${longitude}` +
+                        `&localityLanguage=en`;
+
+
                     const response =
-                        await fetch(
-                            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+                        await fetch(url);
+
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            "Reverse geocoding failed"
                         );
+
+                    }
+
 
                     const data =
                         await response.json();
 
+
                     const city =
                         data.city ||
                         data.locality ||
+                        data.localityInfo?.administrative?.[2]?.name ||
                         data.principalSubdivision ||
                         "Unknown location";
+
 
                     const state =
                         data.principalSubdivision ||
                         "";
 
+
                     setLocation(city);
 
-                    setLocationSub(
-                        state
-                    );
+                    setLocationSub(state);
+
 
                     saveFarmProfile({
+
                         location: city,
+
                         locationSub: state,
-                        latitude,
-                        longitude
+
+                        latitude: latitude,
+
+                        longitude: longitude
+
                     });
 
 
-                    // Get weather
-                    await fetchWeather(
-                        latitude,
-                        longitude
-                    );
+                }
+                catch (error) {
 
-                } catch (error) {
-
-                    console.error(
-                        "Location error:",
+                    console.warn(
+                        "Reverse geocoding failed:",
                         error
                     );
+
 
                     setLocation(
                         "Location detected"
                     );
 
+
                     setLocationSub(
                         `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
                     );
 
+
                     saveFarmProfile({
+
                         location:
                             "Location detected",
+
                         locationSub:
                             `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+
                         latitude,
+
                         longitude
+
                     });
-
-                    await fetchWeather(
-                        latitude,
-                        longitude
-                    );
-
-                } finally {
-
-                    setLocationLoading(false);
 
                 }
 
+
+                // =================================================
+                // WEATHER
+                // =================================================
+
+                await fetchWeather(
+                    latitude,
+                    longitude
+                );
+
+
+                setLocationLoading(false);
+
             },
+
 
             (error) => {
 
@@ -390,29 +546,72 @@ function Home() {
                     error
                 );
 
-                setLocation(
-                    "Location unavailable"
-                );
 
-                setLocationSub(
-                    "Please allow location access"
-                );
+                if (error.code === 1) {
+
+                    setLocation(
+                        "Permission denied"
+                    );
+
+                    setLocationSub(
+                        "Allow location access and try again."
+                    );
+
+                }
+                else if (error.code === 2) {
+
+                    setLocation(
+                        "Location unavailable"
+                    );
+
+                    setLocationSub(
+                        "Your device could not determine your location."
+                    );
+
+                }
+                else if (error.code === 3) {
+
+                    setLocation(
+                        "Request timed out"
+                    );
+
+                    setLocationSub(
+                        "Try detecting your location again."
+                    );
+
+                }
+                else {
+
+                    setLocation(
+                        "Location error"
+                    );
+
+                    setLocationSub(
+                        error.message
+                    );
+
+                }
+
 
                 setLocationLoading(false);
 
             },
 
+
             {
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 15000,
                 maximumAge: 300000
             }
 
         );
+
     };
 
 
-    // ================= THEME =================
+    // ========================================================
+    // THEME
+    // ========================================================
 
     const toggleTheme = () => {
 
@@ -425,10 +624,14 @@ function Home() {
             "cropHealthTheme",
             isDark ? "dark" : "light"
         );
+
     };
 
 
-    // Load saved theme
+    // ========================================================
+    // LOAD SAVED THEME
+    // ========================================================
+
     useEffect(() => {
 
         const savedTheme =
@@ -445,14 +648,11 @@ function Home() {
     }, []);
 
 
-    // ================= CONTACT FORM =================
+    // ========================================================
+    // CONTACT FORM
+    // ========================================================
 
     const handleContactSubmit = (event) => {
-        //make this more better
-
-
-
-
 
         event.preventDefault();
 
@@ -461,12 +661,16 @@ function Home() {
         );
 
         event.target.reset();
+
     };
 
 
-    // ================= JSX =================
+    // ========================================================
+    // JSX
+    // ========================================================
 
     return (
+
         <>
 
             {/* ================= NAVBAR ================= */}
@@ -510,6 +714,7 @@ function Home() {
                             About
                         </Link>
 
+
                         <button
                             id="themeToggle"
                             onClick={toggleTheme}
@@ -538,6 +743,7 @@ function Home() {
                     through digital assistance.
                 </p>
 
+
                 <Link
                     className="btn"
                     to="/disease"
@@ -548,7 +754,7 @@ function Home() {
             </section>
 
 
-            {/* ================= FARM CONTEXT ================= */}
+            {/* ================= FARM PROFILE ================= */}
 
             <div className="page-container">
 
@@ -677,11 +883,7 @@ function Home() {
                         marginTop: "10px"
                     }}
                 >
-
-                    Seasonal Crop Suggestions (
-                    {season}
-                    )
-
+                    Seasonal Crop Suggestions ({season})
                 </h2>
 
 
@@ -713,6 +915,7 @@ function Home() {
                                 </div>
 
                             )
+
                         )
 
                     )}
@@ -911,7 +1114,9 @@ function Home() {
             </footer>
 
         </>
+
     );
+
 }
 
 export default Home;
